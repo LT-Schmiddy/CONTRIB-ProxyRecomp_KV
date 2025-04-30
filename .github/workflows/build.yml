@@ -20,9 +20,9 @@ jobs:
         with:
           name: ProxyRecomp_KV
           path: |
-            ProxyRecomp_KV.so
-            ProxyRecomp_KV.dll
-            ProxyRecomp_KV.dylib
+            ProxyRecomp_KV*.so
+            ProxyRecomp_KV*.dll
+            ProxyRecomp_KV*.dylib
             icon.png
             manifest.json
             README.md

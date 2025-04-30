@@ -20,7 +20,7 @@ int KV_InitImpl() {
         return kvState;
     }
 
-    const char *sql = "CREATE TABLE IF NOT EXISTS storage (key TEXT PRIMARY KEY, value BLOB NOT NULL);";
+    const char *sql = "CREATE TABLE IF NOT EXISTS storage003 (key TEXT, slot INTEGER, value BLOB NOT NULL, PRIMARY KEY(key, slot));";
     kvState = sqlite3_exec(db, sql, 0, 0, 0) == SQLITE_OK;
     if (!kvState) {
         printf("[ProxyRecomp_KV] Failed init, failed table creation: %s\n", sqlite3_errmsg(db));
@@ -43,25 +43,27 @@ DLLEXPORT void KV_Set(uint8_t* rdram, recomp_context* ctx) {
     std::string key = _arg_string<0>(rdram, ctx);
     void* data = _arg<1, void*>(rdram, ctx);
     uint32_t size = _arg<2, uint32_t>(rdram, ctx);
+    uint8_t slot = _arg<3, uint8_t>(rdram, ctx);
 
     if (!KV_InitImpl()) {
-        printf("[ProxyRecomp_KV] Failed SET %s: %s\n", key.c_str(), sqlite3_errmsg(db));
+        printf("[ProxyRecomp_KV] Failed SET %s (slot %d): %s\n", key.c_str(), slot, sqlite3_errmsg(db));
         _return(ctx, 0);
         return;
     }
 
-    const char *sql = "INSERT INTO storage (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value;";
+    const char *sql = "INSERT INTO storage003 (key, slot, value) VALUES (?, ?, ?) ON CONFLICT(key, slot) DO UPDATE SET value = excluded.value;";
     sqlite3_stmt *stmt;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, 0) != SQLITE_OK) {
-        printf("[ProxyRecomp_KV] Failed SET %s: %s\n", key.c_str(), sqlite3_errmsg(db));
+        printf("[ProxyRecomp_KV] Failed SET %s (slot %d): %s\n", key.c_str(), slot, sqlite3_errmsg(db));
         _return(ctx, 0);
         return;
     }
     sqlite3_bind_text(stmt, 1, key.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_blob(stmt, 2, data, size, SQLITE_STATIC);
+    sqlite3_bind_int(stmt, 2, slot);
+    sqlite3_bind_blob(stmt, 3, data, size, SQLITE_STATIC);
     int res = sqlite3_step(stmt) == SQLITE_DONE;
     if (!res) {
-        printf("[ProxyRecomp_KV] Failed SET %s: %s\n", key.c_str(), sqlite3_errmsg(db));
+        printf("[ProxyRecomp_KV] Failed SET %s (slot %d): %s\n", key.c_str(), slot, sqlite3_errmsg(db));
     }
     sqlite3_finalize(stmt);
     _return(ctx, res);
@@ -71,27 +73,29 @@ DLLEXPORT void KV_Get(uint8_t* rdram, recomp_context* ctx) {
     std::string key = _arg_string<0>(rdram, ctx);
     void* dest = _arg<1, void*>(rdram, ctx);
     uint32_t expected_size = _arg<2, uint32_t>(rdram, ctx);
+    uint8_t slot = _arg<3, uint8_t>(rdram, ctx);
 
     if (!KV_InitImpl()) {
-        printf("[ProxyRecomp_KV] Failed GET %s: %s\n", key.c_str(), sqlite3_errmsg(db));
+        printf("[ProxyRecomp_KV] Failed GET %s (slot %d): %s\n", key.c_str(), slot, sqlite3_errmsg(db));
         _return(ctx, 0);
         return;
     }
 
-    const char *sql = "SELECT value FROM storage WHERE key = ?;";
+    const char *sql = "SELECT value FROM storage003 WHERE key = ? AND slot = ?;";
     sqlite3_stmt *stmt;
 
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, 0) != SQLITE_OK) {
-        printf("[ProxyRecomp_KV] Failed GET %s: %s\n", key.c_str(), sqlite3_errmsg(db));
+        printf("[ProxyRecomp_KV] Failed GET %s (slot %d): %s\n", key.c_str(), slot, sqlite3_errmsg(db));
         _return(ctx, 0);
         return;
     }
     sqlite3_bind_text(stmt, 1, key.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_int(stmt, 2, slot);
 
     if (sqlite3_step(stmt) == SQLITE_ROW) {
         size_t stored_size = sqlite3_column_bytes(stmt, 0);
         if (stored_size != expected_size) {  // Fail if sizes don't match
-            printf("[ProxyRecomp_KV] Failed GET %s: Size doesn't match\n", key.c_str());
+            printf("[ProxyRecomp_KV] Failed GET %s (slot %d): Size doesn't match\n", key.c_str(), slot);
             sqlite3_finalize(stmt);
             _return(ctx, 0);
             return;
@@ -103,34 +107,64 @@ DLLEXPORT void KV_Get(uint8_t* rdram, recomp_context* ctx) {
     }
 
     // No need to log this I don't think?
-    // printf("[ProxyRecomp_KV] Failed getting %s: Nothing stored\n", key.c_str());
+    // printf("[ProxyRecomp_KV] Failed getting %s (slot %d): Nothing stored\n", key.c_str(), slot);
     sqlite3_finalize(stmt);
     _return(ctx, 0);
 }
 
 DLLEXPORT void KV_Remove(uint8_t* rdram, recomp_context* ctx) {
     std::string key = _arg_string<0>(rdram, ctx);
+    uint8_t slot = _arg<1, uint8_t>(rdram, ctx);
 
     if (!KV_InitImpl()) {
-        printf("[ProxyRecomp_KV] Failed REMOVE %s: %s\n", key.c_str(), sqlite3_errmsg(db));
+        printf("[ProxyRecomp_KV] Failed REMOVE %s (slot %d): %s\n", key.c_str(), slot, sqlite3_errmsg(db));
         _return(ctx, 0);
         return;
     }
 
-    const char *sql = "DELETE FROM storage WHERE key = ?;";
+    const char *sql = "DELETE FROM storage003 WHERE key = ? AND slot = ?;";
     sqlite3_stmt *stmt;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, 0) != SQLITE_OK) {
-        printf("[ProxyRecomp_KV] Failed REMOVE %s: %s\n", key.c_str(), sqlite3_errmsg(db));
+        printf("[ProxyRecomp_KV] Failed REMOVE %s (slot %d): %s\n", key.c_str(), slot, sqlite3_errmsg(db));
         _return(ctx, 0);
         return;
     }
     sqlite3_bind_text(stmt, 1, key.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_int(stmt, 2, slot);
     int res = sqlite3_step(stmt) == SQLITE_DONE;
     if (!res) {
-        printf("[ProxyRecomp_KV] Failed REMOVE %s: %s\n", key.c_str(), sqlite3_errmsg(db));
+        printf("[ProxyRecomp_KV] Failed REMOVE %s (slot %d): %s\n", key.c_str(), slot, sqlite3_errmsg(db));
     }
     sqlite3_finalize(stmt);
     _return(ctx, res);
+}
+
+DLLEXPORT void KV_Has(uint8_t* rdram, recomp_context* ctx) {
+    std::string key = _arg_string<0>(rdram, ctx);
+    uint8_t slot = _arg<1, uint8_t>(rdram, ctx);
+
+    if (!KV_InitImpl()) {
+        printf("[ProxyRecomp_KV] Failed HAS %s (slot %d): %s\n", key.c_str(), slot, sqlite3_errmsg(db));
+        _return(ctx, 0);
+        return;
+    }
+
+    const char *sql = "SELECT 1 FROM storage003 WHERE key = ? AND slot = ? LIMIT 1;";
+    sqlite3_stmt *stmt;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, 0) != SQLITE_OK) {
+        printf("[ProxyRecomp_KV] Failed HAS %s (slot %d): %s\n", key.c_str(), slot, sqlite3_errmsg(db));
+        _return(ctx, 0);
+        return;
+    }
+    
+    sqlite3_bind_text(stmt, 1, key.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_int(stmt, 2, slot);
+
+    // Return 1 if the key exists, 0 otherwise
+    int exists = sqlite3_step(stmt) == SQLITE_ROW;
+    sqlite3_finalize(stmt);
+    _return(ctx, exists);
 }
 
 }
