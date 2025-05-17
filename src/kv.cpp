@@ -230,7 +230,7 @@ DLLEXPORT void KV_CopySlot(uint8_t* rdram, recomp_context* ctx) {
         return;
     }
 
-    const char *sql = "Insert INTO storage004 (key, slot, value) SELECT key ? value FROM storage004 WHERE slot = ?";
+    const char *sql = "Insert INTO storage004 (key, slot, value) SELECT key, ?, value FROM storage004 WHERE slot = ?";
     sqlite3_stmt *stmt;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, 0) != SQLITE_OK) {
         printf("[ProxyRecomp_KV] Failed COPY slot %d -> slot %d: %s\n", old_slot, new_slot, sqlite3_errmsg(db));
