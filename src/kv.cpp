@@ -186,6 +186,58 @@ DLLEXPORT void KV_Has(uint8_t* rdram, recomp_context* ctx) {
     _return(ctx, exists);
 }
 
+DLLEXPORT void KV_DeleteSlot(uint8_t* rdram, recomp_context* ctx) {
+    uint8_t slot = _arg<0, uint8_t>(rdram, ctx);
 
+    if (!!kvState) {
+        printf("[ProxyRecomp_KV] Failed REMOVE slot %d: %s\n", slot, sqlite3_errmsg(db));
+        _return(ctx, 0);
+        return;
+    }
+
+    const char *sql = "DELETE FROM storage004 WHERE slot = ?;";
+    sqlite3_stmt *stmt;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, 0) != SQLITE_OK) {
+        printf("[ProxyRecomp_KV] Failed REMOVE slot %d: %s\n", slot, sqlite3_errmsg(db));
+        _return(ctx, 0);
+        return;
+    }
+    sqlite3_bind_int(stmt, 1, slot);
+    int res = sqlite3_step(stmt) == SQLITE_DONE;
+    if (!res) {
+        printf("[ProxyRecomp_KV] Failed REMOVE slot %d: %s\n", slot, sqlite3_errmsg(db));
+    }
+    sqlite3_finalize(stmt);
+    _return(ctx, res);
+
+}
+
+DLLEXPORT void KV_CopySlot(uint8_t* rdram, recomp_context* ctx) {
+    uint8_t old_slot = _arg<0, uint8_t>(rdram, ctx);
+    uint8_t new_slot = _arg<1, uint8_t>(rdram, ctx);
+
+    if (!!kvState) {
+        printf("[ProxyRecomp_KV] Failed COPY slot %d -> slot %d: %s\n", old_slot, new_slot, sqlite3_errmsg(db));
+        _return(ctx, 0);
+        return;
+    }
+
+    const char *sql = "Insert INTO storage004 (key, slot, value) SELECT key ? value FROM storage004 WHERE slot = ?";
+    sqlite3_stmt *stmt;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, 0) != SQLITE_OK) {
+        printf("[ProxyRecomp_KV] Failed COPY slot %d -> slot %d: %s\n", old_slot, new_slot, sqlite3_errmsg(db));
+        _return(ctx, 0);
+        return;
+    }
+    sqlite3_bind_int(stmt, 1, new_slot);
+    sqlite3_bind_int(stmt, 2, old_slot);
+    int res = sqlite3_step(stmt) == SQLITE_DONE;
+    if (!res) {
+        printf("[ProxyRecomp_KV] Failed COPY slot %d -> slot %d: %s\n", old_slot, new_slot, sqlite3_errmsg(db));
+    }
+    sqlite3_finalize(stmt);
+    _return(ctx, res);
+
+}
 
 }
