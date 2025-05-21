@@ -48,15 +48,15 @@ DLLEXPORT void KV_PathUpdateInternal(uint8_t* rdram, recomp_context* ctx) {
         printf("[ProxyRecomp_KV] Initializing KV Store at %s\n", new_path.string().c_str());
         _return(ctx, KV_InitImpl());
         return;
-    }
-
-    if (new_path != DB_FILE) {
+    } else if (new_path != DB_FILE) {
         // Restarting DB
         printf("[ProxyRecomp_KV] Reloading KV Store at %s\n", new_path.string().c_str());
         DB_FILE = new_path;
         sqlite3_close(db);
         _return(ctx, KV_InitImpl());
         return;
+    } else {
+        // printf("[ProxyRecomp_KV] No state change needed. %s\n", new_path.string().c_str());
     }
     _return(ctx, kvState);
     return;
@@ -72,7 +72,7 @@ DLLEXPORT void KV_Set(uint8_t* rdram, recomp_context* ctx) {
     uint32_t size = _arg<2, uint32_t>(rdram, ctx);
     uint8_t slot = _arg<3, uint8_t>(rdram, ctx);
 
-    if (!!kvState) {
+    if (!kvState) {
         printf("[ProxyRecomp_KV] Failed SET %s (slot %d): %s\n", key.c_str(), slot, sqlite3_errmsg(db));
         _return(ctx, 0);
         return;
@@ -143,7 +143,7 @@ DLLEXPORT void KV_Remove(uint8_t* rdram, recomp_context* ctx) {
     std::string key = _arg_string<0>(rdram, ctx);
     uint8_t slot = _arg<1, uint8_t>(rdram, ctx);
 
-    if (!!kvState) {
+    if (!kvState) {
         printf("[ProxyRecomp_KV] Failed REMOVE %s (slot %d): %s\n", key.c_str(), slot, sqlite3_errmsg(db));
         _return(ctx, 0);
         return;
@@ -213,9 +213,11 @@ DLLEXPORT void KV_DeleteSlot(uint8_t* rdram, recomp_context* ctx) {
     sqlite3_bind_int(stmt, 1, slot);
     int res = sqlite3_step(stmt) == SQLITE_DONE;
     if (!res) {
-        printf("[ProxyRecomp_KV] 3 Failed REMOVE slot %d: %s\n", slot, sqlite3_errmsg(db));
+        printf("[ProxyRecomp_KV] Failed REMOVE slot %d: %s\n", slot, sqlite3_errmsg(db));
     }
     sqlite3_finalize(stmt);
+
+    printf("[ProxyRecomp_KV] REMOVE slot %d succeeded\n", slot);
     _return(ctx, res);
 
 }
