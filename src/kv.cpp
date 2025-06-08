@@ -25,7 +25,7 @@ int KV_InitImpl() {
         return kvState;
     }
 
-    const char *sql = "CREATE TABLE IF NOT EXISTS storage004 (key TEXT, slot INTEGER, value BLOB NOT NULL, PRIMARY KEY(key, slot));";
+    const char *sql = "CREATE TABLE IF NOT EXISTS storage005 (key TEXT, slot INTEGER, value BLOB NOT NULL, PRIMARY KEY(key, slot));";
     kvState = sqlite3_exec(db, sql, 0, 0, 0) == SQLITE_OK;
     if (!kvState) {
         printf("[ProxyRecomp_KV] Failed init, failed table creation: %s\n", sqlite3_errmsg(db));
@@ -78,7 +78,7 @@ DLLEXPORT void KV_Set(uint8_t* rdram, recomp_context* ctx) {
         return;
     }
 
-    const char *sql = "INSERT INTO storage004 (key, slot, value) VALUES (?, ?, ?) ON CONFLICT(key, slot) DO UPDATE SET value = excluded.value;";
+    const char *sql = "INSERT INTO storage005 (key, slot, value) VALUES (?, ?, ?) ON CONFLICT(key, slot) DO UPDATE SET value = excluded.value;";
     sqlite3_stmt *stmt;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, 0) != SQLITE_OK) {
         printf("[ProxyRecomp_KV] Failed SET %s (slot %d): %s\n", key.c_str(), slot, sqlite3_errmsg(db));
@@ -108,7 +108,7 @@ DLLEXPORT void KV_Get(uint8_t* rdram, recomp_context* ctx) {
         return;
     }
 
-    const char *sql = "SELECT value FROM storage004 WHERE key = ? AND slot = ?;";
+    const char *sql = "SELECT value FROM storage005 WHERE key = ? AND slot = ?;";
     sqlite3_stmt *stmt;
 
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, 0) != SQLITE_OK) {
@@ -149,7 +149,7 @@ DLLEXPORT void KV_Remove(uint8_t* rdram, recomp_context* ctx) {
         return;
     }
 
-    const char *sql = "DELETE FROM storage004 WHERE key = ? AND slot = ?;";
+    const char *sql = "DELETE FROM storage005 WHERE key = ? AND slot = ?;";
     sqlite3_stmt *stmt;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, 0) != SQLITE_OK) {
         printf("[ProxyRecomp_KV] Failed REMOVE %s (slot %d): %s\n", key.c_str(), slot, sqlite3_errmsg(db));
@@ -176,7 +176,7 @@ DLLEXPORT void KV_Has(uint8_t* rdram, recomp_context* ctx) {
         return;
     }
 
-    const char *sql = "SELECT 1 FROM storage004 WHERE key = ? AND slot = ? LIMIT 1;";
+    const char *sql = "SELECT 1 FROM storage005 WHERE key = ? AND slot = ? LIMIT 1;";
     sqlite3_stmt *stmt;
 
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, 0) != SQLITE_OK) {
@@ -203,7 +203,7 @@ DLLEXPORT void KV_DeleteSlot(uint8_t* rdram, recomp_context* ctx) {
         return;
     }
 
-    const char *sql = "DELETE FROM storage004 WHERE slot = ?;";
+    const char *sql = "DELETE FROM storage005 WHERE slot = ?;";
     sqlite3_stmt *stmt;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, 0) != SQLITE_OK) {
         printf("[ProxyRecomp_KV] 2 Failed REMOVE slot %d: %s\n", slot, sqlite3_errmsg(db));
@@ -232,7 +232,7 @@ DLLEXPORT void KV_CopySlot(uint8_t* rdram, recomp_context* ctx) {
         return;
     }
 
-    const char *sql = "Insert INTO storage004 (key, slot, value) SELECT key, ?, value FROM storage004 WHERE slot = ?";
+    const char *sql = "Insert INTO storage005 (key, slot, value) SELECT key, ?, value FROM storage005 WHERE slot = ?";
     sqlite3_stmt *stmt;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, 0) != SQLITE_OK) {
         printf("[ProxyRecomp_KV] Failed COPY slot %d -> slot %d: %s\n", old_slot, new_slot, sqlite3_errmsg(db));

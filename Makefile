@@ -1,5 +1,5 @@
 ZIG = zig c++
-TARGET = ProxyRecomp_KV004
+TARGET = ProxyRecomp_KV005
 CXXFLAGS = -shared -fPIC -I ./include
 
 all: linux windows macos
