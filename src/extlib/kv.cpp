@@ -2,8 +2,7 @@
 #include <string>
 
 #include "sqlite3.h"
-#include "helpers.hpp"
-#include "mod_recomp.h"
+#include "lib_recomp.hpp"
 
 #define DB_FILE_EXT ".ProxyRecomp_KV.db"
 
